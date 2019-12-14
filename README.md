@@ -7,7 +7,7 @@ The Devils Hole Pupfish (*Cyprinodon diabolis*) frequently enters paradoxical an
 The raw sequences are deposited in the NCBI Sequence Read Archive (SRA) under the BioProject accession PRJNA561361
 
 This repository contains following folders -
-- data                     # raw data generated using QIIME2-2018.6
+- data/                    # raw data generated using QIIME2-2018.6
 
   - filtered-table.qza     # OTU table
   - tax.txt                # OTU taxonomy
