@@ -1,0 +1,180 @@
+---
+title: "Pup fish microbiome analysis"
+author: "Shrikant Bhute"
+date: "Mar 05, 2019"
+output: html_document
+---
+
+
+```{r}
+# Activate the required R libraries for the analysis
+library("phyloseq")
+library("grid")
+library("RColorBrewer")
+library("vegan")
+library("ggplot2")
+library("dplyr")
+library("data.table")
+library("knitr")
+library("tidyverse")
+library("reshape2")
+library("broom")
+library("ComplexHeatmap")
+library("circlize")
+
+```
+
+
+```{r}
+otumat=read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/data/process/forphyloseq/table.txt', head=T, sep="\t", row.names=1)
+OTU.a=otu_table(otumat, taxa_are_rows=TRUE)
+temp_tax=read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/data/process/forphyloseq/tax.txt', head=T, sep="\t", row.names=1)
+TAX.a=tax_table(as.matrix(temp_tax))
+map <- read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/data/process/forphyloseq/map.txt', header = TRUE,sep="\t",row.names = 1)
+map<- map[order(row.names(map)),]
+map.a <-sample_data(map)
+outtree<-read_tree('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/data/process/forphyloseq/tree.nwk')
+pseq=phyloseq(OTU.a, TAX.a,map.a,outtree) # This is your phyloseq object
+pseq
+```
+
+
+```{r}
+#alpha diversity plot Figure 2A.
+obs<- ggplot(map, aes(Treatment, Observed, color=Treatment)) +
+    geom_boxplot()+
+    geom_jitter(position=position_jitter(0)) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1,
+                                     size=14,face = "bold", color = "black"),
+          panel.background = element_rect(fill = 'white', colour = 'white'),
+          axis.title.x = element_text(color="black", size=14, face="bold"),
+          axis.title.y = element_text(color="black", size=14, face="bold")) +
+    theme(axis.text.x = element_text(color = "black",size=12,face = "bold"),
+          axis.text.y = element_text(color = "black",size=12,face = "bold")) +
+      scale_color_manual(values =c("deeppink4","deepskyblue3")) +
+    theme(legend.title = element_text(color = "black",size=14,face = "bold")) +
+    theme(legend.text = element_text(color = "black",size=12,face = "bold")) +
+  theme_minimal()
+obs
+
+shannon<- ggplot(map, aes(Treatment, Shannon, color=Treatment)) +
+    geom_boxplot()+
+    geom_jitter(position=position_jitter(0)) +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1,
+                                     size=14,face = "bold", color = "black"),
+          panel.background = element_rect(fill = 'white', colour = 'white'),
+          axis.title.x = element_text(color="black", size=14, face="bold"),
+          axis.title.y = element_text(color="black", size=14, face="bold")) +
+    theme(axis.text.x = element_text(color = "black",size=12,face = "bold"),
+          axis.text.y = element_text(color = "black",size=12,face = "bold")) +
+      scale_color_manual(values =c("deeppink4","deepskyblue3")) +
+    theme(legend.title = element_text(color = "black",size=14,face = "bold")) +
+    theme(legend.text = element_text(color = "black",size=12,face = "bold")) +
+  theme_minimal()
+shannon
+```
+
+
+
+```{r}
+# Beta diversity NMDS plot. Figure 2B.
+set.seed(10)
+pup.bray<-ordinate(pseq,"NMDS","bray",maxit=5000,k=5)
+bdiv <-plot_ordination(pseq,pup.bray,color = "Treatment",shape = "Treatment") + geom_point(size=5) + theme(axis.text.x = element_text(face="bold", color="black", size=14)) + theme(axis.text.y = element_text(face="bold", color="black", size=14)) + theme(axis.title.x = element_text(face="bold",size = 14)) +
+scale_color_manual(values = c("Antibiotic"="deeppink4","Control"="deepskyblue3"))+  
+scale_shape_manual(values = c(19,15)) +
+theme(axis.title.y = element_text(face="bold",size = 14)) + theme_minimal() 
+
+bdiv
+```
+
+
+
+```{r}
+#Phylum-level bar plot. Figure 2C.
+pglom<- tax_glom(pseq,taxrank = 'Phylum') %>% 
+    transform_sample_counts(function(x){x/sum(x)}) %>% psmelt() %>% 
+    filter(Abundance>0.01) %>% arrange(Phylum)
+  
+# abx <- pglom %>% filter(Treatment=="Antibiotic") %>% droplevels()
+# ctrl <- pglom %>% filter(Treatment=="Control") %>% droplevels()
+
+colourCount = length(unique(pglom$Phylum))
+getPalette = colorRampPalette(brewer.pal(12, "Paired"))
+  
+  
+phylum = ggplot(pglom, aes(x = Sample, y = Abundance, fill = Phylum)) +
+    geom_bar(stat = "identity", position = "fill", width = 0.8) +
+    facet_wrap(.~ Treatment, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1,
+                                     size=14,face = "bold", color = "black"),
+          panel.background = element_rect(fill = 'white', colour = 'white'),
+          axis.title.x = element_text(color="black", size=14, face="bold"),
+          axis.title.y = element_text(color="black", size=14, face="bold")) +
+    theme(axis.text.x = element_text(color = "black",size=12,face = "bold"),
+          axis.text.y = element_text(color = "black",size=12,face = "bold")) +
+    ylab("Relative Abundance") +
+    theme(legend.title = element_text(color = "black",size=14,face = "bold")) +
+    scale_fill_manual(values = getPalette(colourCount)) +
+    theme(legend.text = element_text(color = "black",size=12,face = "bold")) 
+  
+phylum
+```
+
+
+```{r}
+# Heatmap of SIMPER taxa. Figure 3.
+
+col_fun = colorRamp2(c(0,0.5,1,1.5,2), c("grey95","beige","darkgoldenrod1","darkorange1", "brown4"))
+mat2<- simperheat[,-(1:2)]
+mat2<-t(mat2)
+mat2scaled<-scale(mat2, center = FALSE)
+mat2scaled[is.na(mat2scaled)] <- 0
+all<- Heatmap(mat2scaled,cluster_rows = FALSE, col = col_fun, cluster_columns = FALSE, rect_gp = gpar(col="white",lwd=0.5))
+
+```
+
+
+```{r}
+# adh contributor analysis
+otumat=read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/closedRef_forPICRUSt/greeggene_rel_ab.txt', head=T, sep="\t", row.names=1)
+OTU.a=otu_table(otumat, taxa_are_rows=TRUE)
+temp_tax=read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/closedRef_forPICRUSt/gg-tax_table.txt', head=T, sep="\t", row.names=1)
+TAX.a=tax_table(as.matrix(temp_tax))
+map <- read.table('C:/Users/Li/Documents/Shrikant/Hedlundlab_other/PupFish/closedRef_forPICRUSt/map.txt', header = TRUE,sep="\t",row.names = 1)
+map<- map[order(row.names(map)),]
+map.a <-sample_data(map)
+gg=phyloseq(OTU.a, TAX.a,map.a) # This is your phyloseq object
+gg
+```
+
+```{r}
+#adh contributors bar plot. Figure 4.
+
+pglom<- tax_glom(gg,taxrank = 'Genus') %>% 
+    psmelt() %>% 
+    arrange(Genus)
+pglom$genus <-"NA" # creating empty column all with Other value
+pglom[pglom$OTU %in% adh,]$genus<- "ADH_Contributor" # Identifying adh contributors as 'ADH_Contributors'. Genus column was updated using this information, adh non-contributors were labeled as Other and stored as adh_contri.txt.
+
+
+colourCount = length(unique(adh_contri$Genus))
+getPalette = colorRampPalette(brewer.pal(11, "Paired"))
+
+plt = ggplot(adh_contri, aes(x = Sample, y = Abundance, fill = Genus)) +
+    geom_bar(stat = "identity", position = "fill", width = 0.8) +
+    facet_wrap(.~Treatment, scales = "free_x") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1,
+                                     size=14,face = "bold", color = "black"),
+          panel.background = element_rect(fill = 'white', colour = 'white'),
+          axis.title.x = element_text(color="black", size=14, face="bold"),
+          axis.title.y = element_text(color="black", size=14, face="bold")) +
+    theme(axis.text.x = element_text(color = "black",size=12,face = "bold"),
+          axis.text.y = element_text(color = "black",size=12,face = "bold")) +
+    ylab("Relative Abundance") +
+    scale_fill_manual(values = getPalette(colourCount)) +
+    theme(legend.title = element_text(color = "black",size=14,face = "bold")) +
+    theme(legend.text = element_text(color = "black",size=12,face = "bold"))
+ 
+plt
+```
